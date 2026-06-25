@@ -1,1 +1,1 @@
-# solar-dashboard
+# solarstats
