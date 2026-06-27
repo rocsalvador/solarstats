@@ -131,5 +131,10 @@ class Dashboard:
             ],
         )
 
-    def run(self):
-        self.app.run(debug=True, use_reloader=False, dev_tools_hot_reload=False)
+    def run(self, dashboard_host: str = "127.0.0.1"):
+        self.app.run(
+            host=dashboard_host,
+            debug=True,
+            use_reloader=False,
+            dev_tools_hot_reload=False,
+        )

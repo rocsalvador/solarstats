@@ -22,6 +22,12 @@ def parse_args():
         default=5,
         help="Polling interval in seconds for updating the dashboard",
     )
+    parser.add_argument(
+        "--dashboard-host",
+        type=str,
+        default="127.0.0.1",
+        help="Host address for the dashboard",
+    )
     args = parser.parse_args()
 
     return args
@@ -35,4 +41,4 @@ if __name__ == "__main__":
         inverter_serial=args.inverter_serial,
         polling_interval=args.polling_interval,
     )
-    dashboard_app.run()
+    dashboard_app.run(dashboard_host=args.dashboard_host)
