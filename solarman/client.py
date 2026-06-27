@@ -1,7 +1,6 @@
 from pysolarmanv5 import PySolarmanV5
 import nmap
 import socket
-import yaml
 
 
 class Client:
