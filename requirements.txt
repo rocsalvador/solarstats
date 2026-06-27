@@ -1,2 +1,4 @@
 pysolarmanv5
 python-nmap
+dash_bootstrap_components
+dash
