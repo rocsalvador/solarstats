@@ -1,8 +1,11 @@
-from dashboard import dashboard
+"""Launch the inverter monitoring dashboard."""
 import argparse
+
+from dashboard import dashboard
 
 
 def parse_args():
+    """Parse and return command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--inverter-ip",
@@ -28,9 +31,8 @@ def parse_args():
         default="127.0.0.1",
         help="Host address for the dashboard",
     )
-    args = parser.parse_args()
 
-    return args
+    return parser.parse_args()
 
 
 if __name__ == "__main__":

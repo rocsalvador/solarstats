@@ -1,26 +1,32 @@
-from solarman.client import Client
+"""Search for a Solarman inverter on the local network."""
 import argparse
+
+from solarman.client import Client
 
 
 def parse_args():
+    """Parse and return command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--network",
         type=str,
         required=True,
-        help="Network to search for the inverter (e.g., 192.168.1.0/24)",
+        help="Network to search for the inverter (e.g., 10.0.0.0/24)",
     )
-    args = parser.parse_args()
 
-    return args
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
 
-    inverter_ip, inverter_serial = Client.search_inverter(args.network)
-    print(f"Inverter at IP: {inverter_ip}")
-    if inverter_serial == 0:
-        print("Inverter serial: not found")
+    result = Client.search_inverter(args.network)
+    if result is None:
+        print("No inverter found on the network.")
     else:
-        print(f"Inverter serial: {inverter_serial}")
+        inverter_ip, inverter_serial = result
+        print(f"Inverter at IP: {inverter_ip}")
+        if inverter_serial == 0:
+            print("Inverter serial: not found")
+        else:
+            print(f"Inverter serial: {inverter_serial}")
