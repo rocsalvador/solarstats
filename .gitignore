@@ -1,1 +1,14 @@
 __pycache__
+*.pyc
+*.pyo
+
+# Runtime logs (contain real IP addresses and serial numbers)
+nohup.out
+*.log
+
+# Database / data files (contain real inverter readings)
+db/*.json
+*.json
+
+# Virtual environment
+.venv/
