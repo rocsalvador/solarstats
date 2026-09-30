@@ -77,6 +77,24 @@ class Logger:
             return True
         return False
 
+    def _handle_read_failure(self, context: str):
+        """Log a read failure, increment counter, and re-connect if threshold exceeded."""
+        log(
+            f"Failed to read {context} registers from inverter at {self.inverter_ip}.",
+            "LOGGER",
+            "ERROR",
+        )
+        self._consecutive_failures += 1
+        if self._consecutive_failures >= self._max_consecutive_failures:
+            log(
+                f"{self._consecutive_failures} consecutive failures. "
+                "Searching for inverter on the network...",
+                "LOGGER",
+                "WARNING",
+            )
+            if self._search_and_reconnect():
+                self._consecutive_failures = 0
+
     def log_current_values(self):
         """Read instant registers and save them to the daily JSON database."""
         log(
@@ -88,14 +106,7 @@ class Logger:
             self.INSTANT_REGISTERS
         )
         if registers_value is None:
-            log(
-                f"Failed to read registers from inverter at {self.inverter_ip}.",
-                "LOGGER",
-                "ERROR",
-            )
-            self._consecutive_failures += 1
-            if self._consecutive_failures >= self._max_consecutive_failures:
-                self._search_and_reconnect()
+            self._handle_read_failure("instant")
             return
 
         self._consecutive_failures = 0
@@ -110,23 +121,43 @@ class Logger:
         )
         registers_value = self.inverter.read_registers_with_retry(self.DAILY_REGISTERS)
         if registers_value is None:
+            self._handle_read_failure("daily")
             return
 
+        self._consecutive_failures = 0
         self._save_to_db(registers_value, "daily")
 
     def run(self, polling_interval: int = 300):
         """Continuously log registers at the given polling interval (seconds).
 
         At the end of each day, daily accumulation registers are also logged.
+        Unexpected errors are caught so the loop continues running.
         """
         while True:
-            self.log_current_values()
-            if (
-                datetime.datetime.now().timestamp() + polling_interval
-                >= datetime.datetime.combine(
-                    datetime.datetime.now().date() + datetime.timedelta(days=1),
-                    datetime.time.min,
-                ).timestamp()
-            ):
-                self.log_daily_values()
+            try:
+                self.log_current_values()
+                if (
+                    datetime.datetime.now().timestamp() + polling_interval
+                    >= datetime.datetime.combine(
+                        datetime.datetime.now().date() + datetime.timedelta(days=1),
+                        datetime.time.min,
+                    ).timestamp()
+                ):
+                    self.log_daily_values()
+            except Exception as e:
+                log(
+                    f"Unexpected error in logger loop: {e}",
+                    "LOGGER",
+                    "ERROR",
+                )
+                self._consecutive_failures += 1
+                if self._consecutive_failures >= self._max_consecutive_failures:
+                    log(
+                        f"{self._consecutive_failures} consecutive failures. "
+                        "Searching for inverter on the network...",
+                        "LOGGER",
+                        "WARNING",
+                    )
+                    if self._search_and_reconnect():
+                        self._consecutive_failures = 0
             time.sleep(polling_interval)
