@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+import threading
 
 
 import dash
@@ -64,6 +65,7 @@ class Dashboard:
         self._register_callbacks()
 
         self.inverter = Client(self.inverter_ip, self.inverter_serial)
+        self._inverter_lock = threading.Lock()
         self.history_data = {
             "soc": [],
             "load_power": [],
@@ -555,6 +557,11 @@ class Dashboard:
 
     def _read_inverter_data(self):
         """Read inverter registers and return the data dict, or None on failure."""
+        with self._inverter_lock:
+            return self._read_inverter_data_impl()
+
+    def _read_inverter_data_impl(self):
+        """Unlocked implementation of _read_inverter_data."""
         if not self.inverter.is_reachable():
             log(
                 f"Inverter at {self.inverter_ip} is not reachable.",
@@ -590,29 +597,30 @@ class Dashboard:
             "DASHBOARD",
             "ERROR",
         )
-        now = datetime.datetime.now()
-        search_due = (
-            self._last_inverter_search is None
-            or (now - self._last_inverter_search).total_seconds() >= 60
-        )
-        if search_due:
-            self._last_inverter_search = now
-            log(
-                "Searching for inverter on the network...", "DASHBOARD", "INFO"
+        with self._inverter_lock:
+            now = datetime.datetime.now()
+            search_due = (
+                self._last_inverter_search is None
+                or (now - self._last_inverter_search).total_seconds() >= 60
             )
-            result = self._find_inverter()
-        else:
-            result = None
-        if result:
-            new_ip, _ = result
-            log(
-                f"Found inverter at {new_ip}. Reconnecting...",
-                "DASHBOARD",
-                "INFO",
-            )
-            self.inverter.disconnect()
-            self.inverter_ip = new_ip
-            self.inverter = Client(self.inverter_ip, self.inverter_serial)
+            if search_due:
+                self._last_inverter_search = now
+                log(
+                    "Searching for inverter on the network...", "DASHBOARD", "INFO"
+                )
+                result = self._find_inverter()
+            else:
+                result = None
+            if result:
+                new_ip, _ = result
+                log(
+                    f"Found inverter at {new_ip}. Reconnecting...",
+                    "DASHBOARD",
+                    "INFO",
+                )
+                self.inverter.disconnect()
+                self.inverter_ip = new_ip
+                self.inverter = Client(self.inverter_ip, self.inverter_serial)
         return (
             html.Div(
                 className="error-message",
@@ -743,7 +751,7 @@ class Dashboard:
         """Start the Dash development server."""
         self.app.run(
             host=dashboard_host,
-            debug=True,
+            debug=False,
             use_reloader=False,
             dev_tools_hot_reload=False,
         )
