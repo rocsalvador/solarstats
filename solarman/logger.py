@@ -144,6 +144,7 @@ class Logger:
                     ).timestamp()
                 ):
                     self.log_daily_values()
+            # pylint: disable=broad-exception-caught
             except Exception as e:
                 log(
                     f"Unexpected error in logger loop: {e}",

@@ -15,10 +15,8 @@ class Client:
     def __init__(self, address: str, serial: int):
         self.address = address
         self.serial = serial
-
-        self.inverter = pysolarmanv5.PySolarmanV5(
-            address, serial, auto_reconnect=True, socket_timeout=10
-        )
+        self.inverter = None
+        self._connect()
 
         self.deye_hybrid_registers = {
             "soc": 0x00B8,
@@ -30,12 +28,57 @@ class Client:
             "total_production": 0x0060,
         }
 
+    def _connect(self) -> bool:
+        """Create the underlying PySolarmanV5 connection.
+
+        Returns ``True`` on success. Connection failures are tolerated so that
+        callers (e.g. the dashboard) can start up and surface the offline state
+        instead of crashing.
+        """
+        try:
+            self.inverter = pysolarmanv5.PySolarmanV5(
+                self.address, self.serial, auto_reconnect=True, socket_timeout=10
+            )
+            return True
+        except (pysolarmanv5.NoSocketAvailableError, OSError) as e:
+            log(
+                f"Could not connect to inverter at {self.address}: {e}",
+                "CLIENT",
+                "ERROR",
+            )
+            self.inverter = None
+            return False
+
+    def _ensure_connected(self):
+        """Ensure an active connection, raising if one cannot be established."""
+        if self.inverter is None and not self._connect():
+            raise pysolarmanv5.NoSocketAvailableError(
+                f"No socket available for {self.address}"
+            )
+
     def disconnect(self):
         """Cleanly disconnect from the inverter."""
         try:
             self.inverter.disconnect()
         except (AttributeError, OSError, pysolarmanv5.NoSocketAvailableError):
             pass
+
+    def is_reachable(self, timeout: float = 2.0) -> bool:
+        """Quickly check whether the data logger accepts TCP connections.
+
+        Returns ``False`` when the host is unreachable or refuses port 8899.
+        This lets the dashboard surface an offline state immediately instead
+        of waiting for the much longer register-read timeout and retries.
+        """
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        try:
+            sock.connect((self.address, 8899))
+            return True
+        except OSError:
+            return False
+        finally:
+            sock.close()
 
     @staticmethod
     def get_inverter_serial(ip: str) -> int:
@@ -44,17 +87,8 @@ class Client:
 
         Sends a minimal V5 frame with serial=0; the data logger responds
         with its real serial number embedded in bytes 7-10 of the reply.
-        Falls back to UDP discovery (port 48899) if TCP fails.
         """
-        serial = Client._get_serial_via_tcp(ip)
-        if serial:
-            return serial
-
-        serial = Client._get_serial_via_udp(ip)
-        if serial:
-            return serial
-
-        return 0
+        return Client._get_serial_via_tcp(ip)
 
     @staticmethod
     def _get_serial_via_tcp(ip: str) -> int:
@@ -97,77 +131,6 @@ class Client:
         return 0
 
     @staticmethod
-    def _parse_udp_response(data: bytes) -> int:
-        """Parse a UDP discovery response and return the serial number."""
-        decoded = data.decode(errors="replace")
-        parts = decoded.split(",")
-        if len(parts) >= 3:
-            try:
-                return int(parts[2])
-            except ValueError:
-                pass
-        return 0
-
-    @staticmethod
-    def _try_udp_broadcast(sock: socket.socket, ip: str) -> int:
-        """Broadcast a WIFIKIT discovery request and check for a response from *ip*."""
-        request = b"WIFIKIT-214028-READ"
-        try:
-            sock.sendto(request, ("255.255.255.255", 48899))
-            while True:
-                try:
-                    data, _addr = sock.recvfrom(1024)
-                except socket.timeout:
-                    break
-                if _addr[0] == ip:
-                    serial = Client._parse_udp_response(data)
-                    if serial:
-                        return serial
-        except OSError:
-            pass
-        return 0
-
-    @staticmethod
-    def _try_udp_unicast(sock: socket.socket, ip: str) -> int:
-        """Send a WIFIKIT discovery request directly to *ip* and parse the response."""
-        request = b"WIFIKIT-214028-READ"
-        try:
-            sock.sendto(request, (ip, 48899))
-            data, _addr = sock.recvfrom(1024)
-            return Client._parse_udp_response(data)
-        except socket.timeout:
-            log(f"No UDP response from {ip}:48899", "CLIENT", "WARNING")
-        except OSError as e:
-            log(f"UDP discovery error for {ip}: {e}", "CLIENT", "WARNING")
-        return 0
-
-    @staticmethod
-    def _get_serial_via_udp(ip: str) -> int:
-        """Discover the logger serial via UDP broadcast (port 48899).
-
-        This is the traditional Solarman WiFi logger discovery protocol.
-        Some older loggers respond to this, newer ones may not.
-        """
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        try:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.bind(("", 0))
-            sock.settimeout(3.0)
-
-            serial = Client._try_udp_broadcast(sock, ip)
-            if serial:
-                return serial
-
-            serial = Client._try_udp_unicast(sock, ip)
-            if serial:
-                return serial
-        finally:
-            sock.close()
-
-        return 0
-
-    @staticmethod
     def search_inverter(broadcast_ip: str) -> tuple[str, int] | None:
         """Scan the network for a Solarman data logging stick.
 
@@ -194,6 +157,7 @@ class Client:
 
     def read_register(self, register_key: str):
         """Read a single register by name (e.g. 'soc') or hex address (e.g. '0x3100')."""
+        self._ensure_connected()
         if register_key in self.deye_hybrid_registers:
             register_address = self.deye_hybrid_registers[register_key]
         else:
@@ -264,10 +228,9 @@ class Client:
 
     def _reconnect(self):
         """Reconnect to the inverter by creating a fresh PySolarmanV5 instance."""
-        try:
-            self.inverter.disconnect()
-        except (AttributeError, OSError, pysolarmanv5.NoSocketAvailableError):
-            pass
-        self.inverter = pysolarmanv5.PySolarmanV5(
-            self.address, self.serial, auto_reconnect=True, socket_timeout=10
-        )
+        if self.inverter is not None:
+            try:
+                self.inverter.disconnect()
+            except (OSError, pysolarmanv5.NoSocketAvailableError):
+                pass
+        self._connect()
