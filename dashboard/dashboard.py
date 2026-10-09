@@ -41,7 +41,25 @@ class Dashboard:
             {"label": "", "value": "custom"},
         ]
 
-        self.app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+        page_title = I18n(self._default_lang)("page.title")
+        self.app = Dash(__name__, title=page_title, external_stylesheets=[dbc.themes.BOOTSTRAP])
+        self.app.index_string = """<!DOCTYPE html>
+<html>
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"/>
+        {%css%}
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>"""
         self.create_layout()
         self._register_callbacks()
 
@@ -59,8 +77,9 @@ class Dashboard:
         self.app.layout = html.Div(
             className="app-shell",
             children=[
-                # Hidden store for the current language.
+                # Hidden stores.
                 dcc.Store(id="lang-store", data=self._default_lang),
+                dcc.Store(id="page-title-trigger", data=self._default_lang),
 
                 html.Div(
                     className="hero",
@@ -68,6 +87,13 @@ class Dashboard:
                         html.Div(
                             className="hero__row",
                             children=[
+                                html.Div(
+                                    className="hero__logo",
+                                    children=html.Img(
+                                        src="/assets/favicon.svg",
+                                        className="hero__logo-img",
+                                    ),
+                                ),
                                 html.Div(
                                     className="hero__eyebrow",
                                     children="SolarStats",
@@ -196,6 +222,17 @@ class Dashboard:
             state=[State("lang-store", "data")],
             prevent_initial_call=True,
         )(self._switch_language)
+
+        # ── Dynamic page title ─────────────────────────────────────────────
+        self.app.clientside_callback(
+            """function(lang) {
+                const titles = {"en": "Inverter Dashboard", "ca": "Panell de l'inversor"};
+                document.title = titles[lang] || "SolarStats";
+                return window.dash_clientside.no_update;
+            }""",
+            Output("page-title-trigger", "data"),
+            Input("lang-store", "data"),
+        )
 
     def _create_history_section(self, t: I18n):
         """Build the historic section, or a notice when no prefix is set."""

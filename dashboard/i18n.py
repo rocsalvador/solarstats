@@ -17,6 +17,7 @@ TRANSLATIONS: dict[Lang, dict[str, str]] = {
     "en": {
         # App
         "app.title": "SolarStats",
+        "page.title": "Inverter Dashboard",
 
         # Hero
         "hero.title": "Inverter Dashboard",
@@ -68,6 +69,7 @@ TRANSLATIONS: dict[Lang, dict[str, str]] = {
     "ca": {
         # App
         "app.title": "SolarStats",
+        "page.title": "Panell de l'inversor",
 
         # Hero
         "hero.title": "Panell de l'inversor",
