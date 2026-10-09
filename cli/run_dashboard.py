@@ -31,6 +31,22 @@ def parse_args():
         default="127.0.0.1",
         help="Host address for the dashboard",
     )
+    parser.add_argument(
+        "--db-prefix",
+        type=str,
+        default=None,
+        help=(
+            "Prefix for the log database files shown in the history section. "
+            "If omitted, the history section is disabled."
+        ),
+    )
+    parser.add_argument(
+        "--lang",
+        type=str,
+        default="ca",
+        choices=["en", "ca"],
+        help="Default language for the dashboard (en = English, ca = Català)",
+    )
 
     return parser.parse_args()
 
@@ -42,5 +58,7 @@ if __name__ == "__main__":
         inverter_ip=args.inverter_ip,
         inverter_serial=args.inverter_serial,
         polling_interval=args.polling_interval,
+        db_prefix=args.db_prefix,
+        default_lang=args.lang,
     )
     dashboard_app.run(dashboard_host=args.dashboard_host)
