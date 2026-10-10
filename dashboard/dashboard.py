@@ -647,21 +647,39 @@ class Dashboard:
             self.history_data["load_power"].pop(0)
             self.history_data["pv_power"].pop(0)
 
+        solar_power = inverter_data["pv1_power"] + inverter_data["pv2_power"]
+        load_power = inverter_data["load_power"]
+
+        if solar_power > load_power:
+            soc_indicator = html.Span(
+                "▲",
+                className="register-card__indicator register-card__indicator--up",
+            )
+        elif load_power > solar_power:
+            soc_indicator = html.Span(
+                "▼",
+                className="register-card__indicator register-card__indicator--down",
+            )
+        else:
+            soc_indicator = html.Span(
+                "—",
+                className="register-card__indicator register-card__indicator--equal",
+            )
+
         cards = html.Div(
             className="register-sections",
             children=[
                 dbc.Row(
                     [
-                        dbc.Col(Card(t("card.soc"), inverter_data["soc"], "%"), md=4),
                         dbc.Col(
-                            Card(t("card.load_power"), inverter_data["load_power"], "W"), md=4
+                            Card(t("card.soc"), inverter_data["soc"], "%", indicator=soc_indicator),
+                            md=4,
                         ),
                         dbc.Col(
-                            Card(
-                                t("card.solar_power"),
-                                inverter_data["pv1_power"] + inverter_data["pv2_power"],
-                                "W",
-                            ),
+                            Card(t("card.load_power"), load_power, "W"), md=4
+                        ),
+                        dbc.Col(
+                            Card(t("card.solar_power"), solar_power, "W"),
                             md=4,
                         ),
                     ]

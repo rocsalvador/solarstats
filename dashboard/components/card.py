@@ -4,15 +4,17 @@ import dash_bootstrap_components as dbc
 
 class Card(dbc.Card):
     def __init__(self, title: str, value, unit: str = "", **kwargs):
+        indicator = kwargs.pop("indicator", None)
         class_name = kwargs.pop("className", "")
         kwargs["className"] = " ".join(
             part for part in ["register-card", class_name] if part
         )
 
         super().__init__(**kwargs)
-        reading_children = [
-            html.Span(str(value), className="register-card__value"),
-        ]
+        reading_children = []
+        if indicator is not None:
+            reading_children.append(indicator)
+        reading_children.append(html.Span(str(value), className="register-card__value"))
         if unit:
             reading_children.append(html.Span(unit, className="register-card__unit"))
 

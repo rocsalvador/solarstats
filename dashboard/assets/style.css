@@ -121,7 +121,7 @@ body {
 
 /* ── Status pill ───────────────────────────────────────────────────── */
 .status-pill {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
@@ -259,6 +259,25 @@ body {
   font-size: 13px;
   font-weight: 500;
   line-height: 1;
+}
+
+.register-card__indicator {
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.register-card__indicator--up {
+  color: var(--stats-green);
+}
+
+.register-card__indicator--down {
+  color: var(--stats-red);
+}
+
+.register-card__indicator--equal {
+  color: var(--stats-muted);
 }
 
 .register-card--error {
