@@ -11,12 +11,11 @@ class Card(dbc.Card):
         )
 
         super().__init__(**kwargs)
-        reading_children = []
-        if indicator is not None:
-            reading_children.append(indicator)
-        reading_children.append(html.Span(str(value), className="register-card__value"))
+        reading_children = [html.Span(str(value), className="register-card__value")]
         if unit:
             reading_children.append(html.Span(unit, className="register-card__unit"))
+        if indicator is not None:
+            reading_children.append(indicator)
 
         self.children = dbc.CardBody(
             [
