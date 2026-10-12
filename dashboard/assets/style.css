@@ -549,7 +549,9 @@ body {
 }
 
 .row {
-  margin: 0;
+  /* Cancel the 4px column padding so rows span the full section width
+     (matches the advanced box and graph containers). */
+  margin: 0 -4px;
 }
 
 .row > [class*="col-"] {
