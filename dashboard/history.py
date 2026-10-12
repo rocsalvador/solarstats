@@ -166,18 +166,17 @@ class HistoryStore:
             values, "pv2_power"
         )
 
-    def energy_totals(self, start=None, end=None) -> dict:
-        """Integrate power over the range to estimate energy in kWh.
+    def _energy_intervals(self, start, end):
+        """Yield ``(timestamp, energy_used_kwh, energy_solar_kwh)`` per interval.
 
-        Returns ``{"energy_used": kWh, "energy_solar": kWh}``. The power
-        readings are integrated over time using the trapezoidal rule; intervals
-        longer than :attr:`ENERGY_MAX_GAP` are skipped so logging downtime does
-        not inflate the totals.
+        The power readings are integrated over time using the trapezoidal rule;
+        intervals longer than :attr:`ENERGY_MAX_GAP` are skipped so logging
+        downtime does not inflate the totals. Energy is attributed to the
+        interval start.
         """
-        totals = {"energy_used": 0.0, "energy_solar": 0.0}
         records = self._load()
         if len(records) < 2:
-            return totals
+            return
 
         if start is None:
             start = records[0][0]
@@ -190,7 +189,7 @@ class HistoryStore:
             if start <= timestamp <= end
         ]
         if len(selected) < 2:
-            return totals
+            return
 
         max_gap = self.ENERGY_MAX_GAP.total_seconds()
         for (time_a, values_a), (time_b, values_b) in zip(selected, selected[1:]):
@@ -203,6 +202,32 @@ class HistoryStore:
                 + self._numeric(values_b, "load_power")
             ) / 2.0
             solar_avg = (self._pv_power(values_a) + self._pv_power(values_b)) / 2.0
-            totals["energy_used"] += used_avg * hours / 1000.0
-            totals["energy_solar"] += solar_avg * hours / 1000.0
+            yield time_a, used_avg * hours / 1000.0, solar_avg * hours / 1000.0
+
+    def energy_totals(self, start=None, end=None) -> dict:
+        """Integrate power over the range to estimate total energy in kWh.
+
+        Returns ``{"energy_used": kWh, "energy_solar": kWh}``.
+        """
+        totals = {"energy_used": 0.0, "energy_solar": 0.0}
+        for _, used, solar in self._energy_intervals(start, end):
+            totals["energy_used"] += used
+            totals["energy_solar"] += solar
         return totals
+
+    def energy_by_period(self, start=None, end=None, period: str = "day") -> list[dict]:
+        """Integrate energy into per-``"day"`` or per-``"month"`` buckets.
+
+        Returns ``[{"label": str, "energy_used": kWh, "energy_solar": kWh}]``,
+        ordered by time, for the bar plots shown on long history ranges.
+        """
+        date_format = "%Y-%m" if period == "month" else "%Y-%m-%d"
+        buckets: dict[str, dict] = {}
+        for timestamp, used, solar in self._energy_intervals(start, end):
+            bucket = buckets.setdefault(
+                timestamp.strftime(date_format),
+                {"energy_used": 0.0, "energy_solar": 0.0},
+            )
+            bucket["energy_used"] += used
+            bucket["energy_solar"] += solar
+        return [{"label": label, **buckets[label]} for label in sorted(buckets)]

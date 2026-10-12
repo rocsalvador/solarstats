@@ -17,6 +17,13 @@ from solarman.client import Client
 from utils.log import log
 
 
+HISTORY_BAR_MIN_SPAN = datetime.timedelta(days=2)
+HISTORY_MONTHLY_MIN_SPAN = datetime.timedelta(days=31)
+
+TEMPERATURE_OFFSET = 1000
+TEMPERATURE_SCALE = 0.1
+
+
 class Dashboard:
     """Dash web application that displays live inverter register values and history charts."""
     def __init__(
@@ -336,6 +343,26 @@ class Dashboard:
         )
 
     @staticmethod
+    def _figure_layout(**overrides):
+        """Return the shared Plotly layout styling (light theme)."""
+        layout = {
+            "legend": {
+                "orientation": "h",
+                "yanchor": "bottom",
+                "y": 1.02,
+                "xanchor": "right",
+                "x": 1,
+                "font": {"size": 12, "color": "#161616"},
+            },
+            "plot_bgcolor": "#ffffff",
+            "paper_bgcolor": "#ffffff",
+            "font": {"family": '"IBM Plex Mono", ui-monospace, monospace', "size": 12},
+            "margin": {"t": 40, "b": 40, "l": 60, "r": 60},
+        }
+        layout.update(overrides)
+        return go.Layout(**layout)
+
+    @staticmethod
     def _build_figure(
         x, soc_values, load_values, pv_values, t, *, hovermode=None, empty=False
     ):
@@ -384,7 +411,7 @@ class Dashboard:
         ]
         power_range = [0, max(power_values, default=0) * 1.1]
 
-        layout = go.Layout(
+        layout = Dashboard._figure_layout(
             xaxis={
                 "showgrid": True,
                 "gridcolor": "#0000001a",
@@ -411,18 +438,6 @@ class Dashboard:
                 "showgrid": False,
                 "tickfont": {"size": 12, "color": "#5c5c5c"},
             },
-            legend={
-                "orientation": "h",
-                "yanchor": "bottom",
-                "y": 1.02,
-                "xanchor": "right",
-                "x": 1,
-                "font": {"size": 12, "color": "#161616"},
-            },
-            plot_bgcolor="#ffffff",
-            paper_bgcolor="#ffffff",
-            font={"family": '"IBM Plex Mono", ui-monospace, monospace', "size": 12},
-            margin={"t": 40, "b": 40, "l": 60, "r": 60},
         )
         if hovermode:
             layout.hovermode = hovermode
@@ -493,6 +508,60 @@ class Dashboard:
             empty=not points,
         )
 
+    @staticmethod
+    def _create_energy_bar_figure(buckets, t: I18n):
+        """Build a grouped bar chart of energy production and consumption.
+
+        ``buckets`` come from ``HistoryStore.energy_by_period`` and are already
+        ordered by time. Used for long ranges where a line chart is unreadable.
+        """
+        labels = [bucket["label"] for bucket in buckets]
+        figure = go.Figure(
+            data=[
+                go.Bar(
+                    x=labels,
+                    y=[bucket["energy_solar"] for bucket in buckets],
+                    name=t("history.energy_production"),
+                    marker_color="#3b5cf6",
+                ),
+                go.Bar(
+                    x=labels,
+                    y=[bucket["energy_used"] for bucket in buckets],
+                    name=t("history.energy_consumption"),
+                    marker_color="#b82d35",
+                ),
+            ],
+            layout=Dashboard._figure_layout(
+                barmode="group",
+                xaxis={
+                    "type": "category",
+                    "showgrid": False,
+                    "tickangle": -45,
+                    "automargin": True,
+                    "tickfont": {"size": 12, "color": "#5c5c5c"},
+                },
+                yaxis={
+                    "title": "Energy (kWh)",
+                    "showgrid": True,
+                    "gridcolor": "#0000001a",
+                    "gridwidth": 1,
+                    "zeroline": False,
+                    "tickfont": {"size": 12, "color": "#5c5c5c"},
+                },
+            ),
+        )
+        if not buckets:
+            figure.add_annotation(
+                text=t("history.no_data"),
+                showarrow=False,
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.5,
+                font={"size": 14, "color": "#5c5c5c"},
+            )
+        return figure
+
     def _create_history_cards(self, totals, t: I18n):
         """Build the metric cards summarising energy over the history range."""
         return html.Div(
@@ -532,9 +601,25 @@ class Dashboard:
         start, end = self._resolve_history_range(range_value, start_date, end_date)
         points = self.history_store.series(start, end)
         totals = self.history_store.energy_totals(start, end)
+        span = (
+            points[-1]["timestamp"] - points[0]["timestamp"]
+            if points
+            else datetime.timedelta(0)
+        )
+        # Long ranges are clearer as energy bars than as a dense line chart.
+        if span >= HISTORY_MONTHLY_MIN_SPAN:
+            figure = self._create_energy_bar_figure(
+                self.history_store.energy_by_period(start, end, "month"), t
+            )
+        elif span >= HISTORY_BAR_MIN_SPAN:
+            figure = self._create_energy_bar_figure(
+                self.history_store.energy_by_period(start, end, "day"), t
+            )
+        else:
+            figure = self._create_history_figure(points, t)
         return (
             self._create_history_cards(totals, t),
-            self._create_history_figure(points, t),
+            figure,
             custom_style,
         )
 
