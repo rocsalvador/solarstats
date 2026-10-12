@@ -12,6 +12,8 @@ from utils.log import log
 class Client:
     """Client for communicating with a Solarman V5 data-logging stick."""
 
+    _SIGNED_REGISTERS = frozenset({0x00BF, 0x00BE, 0x00A4, 0x005A, 0x005B})
+
     def __init__(self, address: str, serial: int):
         self.address = address
         self.serial = serial
@@ -26,6 +28,17 @@ class Client:
             "daily_production": 0x006C,
             "daily_consumption": 0x0054,
             "total_production": 0x0060,
+            "battery_voltage": 0x00B7,
+            "battery_current": 0x00BF,
+            "battery_power": 0x00BE,
+            "battery_temperature": 0x00B6,
+            "current_l1": 0x00A4,
+            "dc_temperature": 0x005A,
+            "ac_temperature": 0x005B,
+            "pv1_voltage": 0x006D,
+            "pv1_current": 0x006E,
+            "pv2_voltage": 0x006F,
+            "pv2_current": 0x0070,
         }
 
     def _connect(self) -> bool:
@@ -165,7 +178,14 @@ class Client:
         register_value = self.inverter.read_holding_registers(
             register_address, quantity=1
         )[0]
+        if register_address in self._SIGNED_REGISTERS:
+            register_value = self._to_signed(register_value)
         return register_value
+
+    @staticmethod
+    def _to_signed(value: int) -> int:
+        """Interpret a 16-bit holding register as a signed integer."""
+        return value - 0x10000 if value & 0x8000 else value
 
     def read_registers(self, register_keys: list[str]) -> dict[str, int]:
         """Read multiple registers and return a dict mapping key to value."""

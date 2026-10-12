@@ -26,6 +26,26 @@ TRANSLATIONS: dict[Lang, dict[str, str]] = {
         # Live section
         "live.heading": "Live",
         "live.description": "Current inverter register values, refreshed every {seconds} seconds.",
+        "live.advanced": "Advanced details",
+
+        # Advanced detail rows (live)
+        "adv.battery": "Battery",
+        "adv.inverter": "Inverter",
+        "adv.battery_voltage": "Battery Voltage",
+        "adv.battery_current": "Battery Current",
+        "adv.battery_power": "Battery Power",
+        "adv.battery_temperature": "Battery Temperature",
+        "adv.grid_voltage_l1": "Grid Voltage L1",
+        "adv.current_l1": "Current L1",
+        "adv.dc_temperature": "DC Temperature",
+        "adv.ac_temperature": "AC Temperature",
+        "adv.solar": "Solar Panels",
+        "adv.pv1_power": "PV1 Power",
+        "adv.pv2_power": "PV2 Power",
+        "adv.pv1_current": "PV1 Current",
+        "adv.pv2_current": "PV2 Current",
+        "adv.pv1_voltage": "PV1 Voltage",
+        "adv.pv2_voltage": "PV2 Voltage",
 
         # Register cards (live)
         "card.soc": "SOC",
@@ -76,8 +96,28 @@ TRANSLATIONS: dict[Lang, dict[str, str]] = {
         "hero.subtitle": "Lectures en directe i històric de dades del vostre inversor.",
 
         # Live section
-        "live.heading": "Directe",
+        "live.heading": "En directe",
         "live.description": "Valors actuals dels registres de l'inversor, actualitzats cada {seconds} segons.",
+        "live.advanced": "Detalls avançats",
+
+        # Advanced detail rows (live)
+        "adv.battery": "Bateria",
+        "adv.inverter": "Inversor",
+        "adv.battery_voltage": "Tensió de la bateria",
+        "adv.battery_current": "Corrent de la bateria",
+        "adv.battery_power": "Potència de la bateria",
+        "adv.battery_temperature": "Temperatura de la bateria",
+        "adv.grid_voltage_l1": "Tensió de xarxa L1",
+        "adv.current_l1": "Corrent L1",
+        "adv.dc_temperature": "Temperatura DC",
+        "adv.ac_temperature": "Temperatura AC",
+        "adv.solar": "Plaques solars",
+        "adv.pv1_power": "Potència PV1",
+        "adv.pv2_power": "Potència PV2",
+        "adv.pv1_current": "Corrent PV1",
+        "adv.pv2_current": "Corrent PV2",
+        "adv.pv1_voltage": "Tensió PV1",
+        "adv.pv2_voltage": "Tensió PV2",
 
         # Register cards (live)
         "card.soc": "SOC",

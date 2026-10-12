@@ -161,6 +161,21 @@ class Dashboard:
                             ],
                         ),
                         html.Div(id="inverter-cards", className="live-cards"),
+                        html.Details(
+                            className="advanced",
+                            open=False,
+                            children=[
+                                html.Summary(
+                                    id="advanced-summary",
+                                    className="advanced__summary",
+                                    children=t("live.advanced"),
+                                ),
+                                html.Div(
+                                    id="advanced-content",
+                                    className="advanced__content",
+                                ),
+                            ],
+                        ),
                         dcc.Graph(
                             id="inverter-graph",
                             className="graph-container",
@@ -184,6 +199,7 @@ class Dashboard:
                 Output("inverter-cards", "children"),
                 Output("inverter-graph", "figure"),
                 Output("inverter-status", "children"),
+                Output("advanced-content", "children"),
             ],
             inputs=[
                 Input("interval-component", "n_intervals"),
@@ -219,6 +235,7 @@ class Dashboard:
                 Output("hero-subtitle", "children"),
                 Output("live-heading", "children"),
                 Output("live-description", "children"),
+                Output("advanced-summary", "children"),
                 Output("history-heading", "children"),
                 Output("history-description", "children"),
                 Output("history-range", "options"),
@@ -640,6 +657,102 @@ class Dashboard:
             children=label,
         )
 
+    @staticmethod
+    def _temperature(raw: int) -> float:
+        """Convert a raw temperature register to degrees Celsius."""
+        return (raw - TEMPERATURE_OFFSET) * TEMPERATURE_SCALE
+
+    @staticmethod
+    def _advanced_row(label, value, unit):
+        """One label/value/unit row of the advanced detail table."""
+        return html.Div(
+            className="advanced-row",
+            children=[
+                html.Span(label, className="advanced-row__label"),
+                html.Div(
+                    className="advanced-row__reading",
+                    children=[
+                        html.Span(value, className="advanced-row__value"),
+                        html.Span(unit, className="advanced-row__unit"),
+                    ],
+                ),
+            ],
+        )
+
+    def _create_advanced_content(self, data, t: I18n):
+        """Build the advanced battery, inverter and solar detail groups."""
+        battery = [
+            self._advanced_row(
+                t("adv.battery_voltage"), f"{data['battery_voltage'] * 0.01:.2f}", "V"
+            ),
+            self._advanced_row(
+                t("adv.battery_current"), f"{data['battery_current'] * 0.01:.2f}", "A"
+            ),
+            self._advanced_row(t("adv.battery_power"), str(data["battery_power"]), "W"),
+            self._advanced_row(
+                t("adv.battery_temperature"),
+                f"{self._temperature(data['battery_temperature']):.1f}",
+                "°C",
+            ),
+        ]
+        inverter = [
+            self._advanced_row(
+                t("adv.dc_temperature"),
+                f"{self._temperature(data['dc_temperature']):.1f}",
+                "°C",
+            ),
+            self._advanced_row(
+                t("adv.ac_temperature"),
+                f"{self._temperature(data['ac_temperature']):.1f}",
+                "°C",
+            ),
+        ]
+        solar = [
+            self._advanced_row(t("adv.pv1_power"), str(data["pv1_power"]), "W"),
+            self._advanced_row(t("adv.pv2_power"), str(data["pv2_power"]), "W"),
+            self._advanced_row(
+                t("adv.pv1_current"), f"{data['pv1_current'] * 0.1:.1f}", "A"
+            ),
+            self._advanced_row(
+                t("adv.pv2_current"), f"{data['pv2_current'] * 0.1:.1f}", "A"
+            ),
+            self._advanced_row(
+                t("adv.pv1_voltage"), f"{data['pv1_voltage'] * 0.1:.1f}", "V"
+            ),
+            self._advanced_row(
+                t("adv.pv2_voltage"), f"{data['pv2_voltage'] * 0.1:.1f}", "V"
+            ),
+        ]
+        return dbc.Row(
+            className="advanced-groups",
+            children=[
+                dbc.Col(
+                    className="advanced-group",
+                    md=4,
+                    children=[
+                        html.Div(t("adv.battery"), className="advanced-group__title"),
+                        *battery,
+                    ],
+                ),
+                dbc.Col(
+                    className="advanced-group",
+                    md=4,
+                    children=[
+                        html.Div(t("adv.inverter"), className="advanced-group__title"),
+                        *inverter,
+                    ],
+                ),
+                dbc.Col(
+                    className="advanced-group",
+                    md=4,
+                    children=[
+                        html.Div(t("adv.solar"), className="advanced-group__title"),
+                        *solar,
+                    ],
+                ),
+            ],
+        )
+
     def _read_inverter_data(self):
         """Read inverter registers and return the data dict, or None on failure."""
         with self._inverter_lock:
@@ -663,6 +776,17 @@ class Dashboard:
                 "daily_production",
                 "daily_consumption",
                 "total_production",
+                "battery_voltage",
+                "battery_current",
+                "battery_power",
+                "battery_temperature",
+                "current_l1",
+                "dc_temperature",
+                "ac_temperature",
+                "pv1_voltage",
+                "pv1_current",
+                "pv2_voltage",
+                "pv2_current",
             ]
         )
 
@@ -713,6 +837,7 @@ class Dashboard:
             ),
             go.Figure(),
             self._create_status_indicator("offline", t),
+            html.Div(),
         )
 
     def _update_dashboard(self, n_intervals, lang):  # pylint: disable=unused-argument
@@ -806,7 +931,9 @@ class Dashboard:
             self.history_data["load_power"],
             self.history_data["pv_power"],
             t,
-        ), self._create_status_indicator("live", t)
+        ), self._create_status_indicator("live", t), self._create_advanced_content(
+            inverter_data, t
+        )
 
     def _switch_language(self, en_clicks, ca_clicks, current_lang):  # pylint: disable=unused-argument
         """Handle language-switcher clicks and update all translatable text."""
@@ -841,6 +968,7 @@ class Dashboard:
             t("hero.subtitle"),
             t("live.heading"),
             t("live.description", seconds=self.polling_interval),
+            t("live.advanced"),
             t("history.heading"),
             t("history.description") if self.history_store else t("history.unavailable"),
             range_options,
