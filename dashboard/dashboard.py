@@ -867,12 +867,12 @@ class Dashboard:
 
         if solar_power > load_power:
             soc_indicator = html.Span(
-                "▲",
+                "↗",
                 className="register-card__indicator register-card__indicator--up",
             )
         elif load_power > solar_power:
             soc_indicator = html.Span(
-                "▼",
+                "↘",
                 className="register-card__indicator register-card__indicator--down",
             )
         else:
