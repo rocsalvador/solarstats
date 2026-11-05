@@ -144,7 +144,7 @@ class Client:
         return 0
 
     @staticmethod
-    def search_inverter(broadcast_ip: str) -> tuple[str, int] | None:
+    def search_inverter(broadcast_ip: str) -> list[tuple[str, int]] | None:
         """Scan the network for a Solarman data logging stick.
 
         Uses nmap to find hosts with TCP port 8899 open, then attempts
@@ -154,15 +154,15 @@ class Client:
         """
         port_scanner = nmap.PortScanner()
         port_scanner.scan(hosts=broadcast_ip, arguments="-sT -p 8899 --open")
+        candidates = []
         for candidate_ip in port_scanner.all_hosts():
             if (
                 port_scanner[candidate_ip].has_tcp(8899)
                 and port_scanner[candidate_ip]["tcp"][8899]["state"] == "open"
             ):
                 serial = Client.get_inverter_serial(candidate_ip)
-                if serial:
-                    return (candidate_ip, serial)
-        return None
+                candidates.append((candidate_ip, serial))
+        return candidates
 
     def get_available_registers(self) -> list[str]:
         """Return the list of named register keys this client can read."""

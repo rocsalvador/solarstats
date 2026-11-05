@@ -21,12 +21,10 @@ if __name__ == "__main__":
     args = parse_args()
 
     result = Client.search_inverter(args.network)
-    if result is None:
+    if not result:
         print("No inverter found on the network.")
     else:
-        inverter_ip, inverter_serial = result
-        print(f"Inverter at IP: {inverter_ip}")
-        if inverter_serial == 0:
-            print("Inverter serial: not found")
-        else:
-            print(f"Inverter serial: {inverter_serial}")
+        print(f"Found {len(result)} possible inverter(s) on the network:")
+        for inverter_ip, inverter_serial in result:
+            print(f"- IP: {inverter_ip}")
+            print(f"  Serial: {inverter_serial}")

@@ -64,17 +64,18 @@ class Logger:
         )
         result = Client.search_inverter(self.inverter_ip + "/24")
         if result:
-            new_ip, _ = result
-            log(
-                f"Found inverter at {new_ip}. Reconnecting...",
-                "LOGGER",
-                "INFO",
-            )
-            self.inverter.disconnect()
-            self.inverter_ip = new_ip
-            self.inverter = Client(self.inverter_ip, self.inverter_serial)
-            self._consecutive_failures = 0
-            return True
+            for new_ip, serial in result:
+                if serial == self.inverter_serial:
+                    log(
+                        f"Found inverter at {new_ip}. Reconnecting...",
+                        "LOGGER",
+                        "INFO",
+                    )
+                    self.inverter.disconnect()
+                    self.inverter_ip = new_ip
+                    self.inverter = Client(self.inverter_ip, self.inverter_serial)
+                    self._consecutive_failures = 0
+                    return True
         return False
 
     def _handle_read_failure(self, context: str):

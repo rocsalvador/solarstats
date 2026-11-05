@@ -133,7 +133,7 @@ class Dashboard:
                         html.Div(
                             className="hero__meta",
                             children=[
-                                html.Span(f"IP {self.inverter_ip}"),
+                                html.Span(id="inverter-ip", children=f"IP {self.inverter_ip}"),
                                 html.Div(
                                     id="inverter-status",
                                     children=self._create_status_indicator(
@@ -198,6 +198,7 @@ class Dashboard:
             output=[
                 Output("inverter-cards", "children"),
                 Output("inverter-graph", "figure"),
+                Output("inverter-ip", "children"),
                 Output("inverter-status", "children"),
                 Output("advanced-content", "children"),
             ],
@@ -821,31 +822,35 @@ class Dashboard:
             else:
                 result = None
             if result:
-                new_ip, _ = result
-                log(
-                    f"Found inverter at {new_ip}. Reconnecting...",
-                    "DASHBOARD",
-                    "INFO",
-                )
-                self.inverter.disconnect()
-                self.inverter_ip = new_ip
-                self.inverter = Client(self.inverter_ip, self.inverter_serial)
-        return (
-            html.Div(
-                className="error-message",
-                children=t("error.reading", seconds=self.polling_interval),
-            ),
-            go.Figure(),
-            self._create_status_indicator("offline", t),
-            html.Div(),
-        )
+                for ip, serial in result:
+                    if serial == self.inverter_serial:
+                        log(
+                            f"Found inverter at {ip}. Reconnecting...",
+                            "DASHBOARD",
+                            "INFO",
+                        )
+                        self.inverter.disconnect()
+                        self.inverter_ip = ip
+                        self.inverter = Client(self.inverter_ip, self.inverter_serial)
+                        return True
+        return False
 
     def _update_dashboard(self, n_intervals, lang):  # pylint: disable=unused-argument
         """Read inverter data and return updated cards, graph, and status."""
         t = I18n(lang)
         inverter_data = self._read_inverter_data()
         if inverter_data is None:
-            return self._handle_read_failure(t)
+            if not self._handle_read_failure(t):
+                return (
+                    html.Div(
+                        className="error-message",
+                        children=t("error.reading", seconds=self.polling_interval),
+                    ),
+                    go.Figure(),
+                    f"IP {self.inverter_ip}",
+                    self._create_status_indicator("offline", t),
+                    html.Div(),
+                )
 
         self.history_data["soc"].append(inverter_data["soc"])
         self.history_data["load_power"].append(inverter_data["load_power"])
@@ -931,7 +936,7 @@ class Dashboard:
             self.history_data["load_power"],
             self.history_data["pv_power"],
             t,
-        ), self._create_status_indicator("live", t), self._create_advanced_content(
+        ), f"IP {self.inverter_ip}", self._create_status_indicator("live", t), self._create_advanced_content(
             inverter_data, t
         )
 
